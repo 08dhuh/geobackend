@@ -4,9 +4,10 @@ import requests
 from bs4 import BeautifulSoup
 import urllib
 import re
-
+import logging
 from .reference_data import *
 
+logger = logging.getLogger('geobackend_api')
 
 def get_bbox_params(coordinates, min_resolution:int|float=100, pixels=(100,100), crs_type:str='wgs84' ):
     """
@@ -70,6 +71,7 @@ def parse_wms_layers(response:requests.Response) -> list:
         layers += ['114bse'] #basement layer at the bottom
         return layers
     else:
+        logger.error(f"Error in parse_wms_layers: {response.status_code}, {response.text}")
         raise requests.exceptions.HTTPError(f"Error: {response.status_code}, {response.text}")
     
 
@@ -112,15 +114,19 @@ def wms_aquifer_info_request(layer_string:str, bbox_params):
 
 def parse_layer_info(response):
     if response.status_code != 200:
+        logger.error(f"Error in parse_layer_info: {response.status_code}, {response.text}")
         raise requests.exceptions.HTTPError(f"Error: {response.status_code}, {response.text}")
+    
     data = {}
-    soup = BeautifulSoup(response.text)
-    rows = soup.find_all('div', class_='row')    
+    soup = BeautifulSoup(response.text, 'html.parser')
+    rows = soup.find_all('div', class_='row')
+    
     for row in rows:
         cols = row.find_all('div')
         if len(cols) == 2:
             key = cols[0].text.strip()
             value = cols[1].text.strip()
+            
             match = re.match(r"(\w+)\s+(\d+)", key)
             if match:
                 field, num_part = match.groups()
@@ -128,7 +134,15 @@ def parse_layer_info(response):
                     layer_code = num_to_code_mapping[num_part]
                     if layer_code not in data:
                         data[layer_code] = {}
-                    data[layer_code][field] = float(value)
+                    try:
+                        # Handle the -9999 value
+                        float_value = float(value.replace(',', ''))
+                        if float_value == -9999:
+                            logger.info(f"Aqdepth for {layer_code} is -9999, treating as 0")
+                            float_value = 0
+                        data[layer_code][field] = float_value
+                    except ValueError:
+                        logger.error(f"Could not convert {value} to float for {key}")
     return data
 
 
@@ -139,6 +153,9 @@ def format_data_depth_table(layer_data:list):
     for key, item in layer_data.items():
         layer_dict['aquifer_layer'].append(key)
         layer_dict['is_aquifer'].append(is_aquifer[key])
-        depth = (item['Aqdepth'] if 'Aqdepth' in item else 0) + (item['Thickness'] if 'Thickness' in item else 200)
+        aquidepth = item.get('Aqdepth', 0)
+        if aquidepth == -9999: aquidepth = 0 #ensure -9999 is treated as 0
+        thickness = item.get('Thickness',0)
+        depth = aquidepth + thickness
         layer_dict['depth_to_base'].append(depth)
     return layer_dict
