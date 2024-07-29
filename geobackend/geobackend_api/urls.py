@@ -1,13 +1,14 @@
 from django.urls import path
 from rest_framework import routers
-from . import views
+from .views import *
 
 router = routers.DefaultRouter()
-router.register('depth-profile', views.DepthProfileViewSet)
-router.register('depth-layer', views.DepthLayerViewSet)
+# router.register('depth-profile', views.DepthProfileViewSet)
+# router.register('depth-layer', views.DepthLayerViewSet)
 
 urlpatterns = [
-    path('calculate-profile', views.WellboreCalculationView.as_view()),
+    path('calculate-wellbore', WellBoreCalcView.as_view()),
+    path('calculate-profile', WellboreCalculationView.as_view()),
 
 ] 
 

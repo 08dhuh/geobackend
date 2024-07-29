@@ -9,6 +9,17 @@ from .reference_data import *
 
 logger = logging.getLogger('geobackend_api')
 
+
+def process_depth_data(coordinates, min_resolution:int|float=100, pixels=(100,100), crs_type:str='wgs84'):
+    bbox_params = get_bbox_params(coordinates, min_resolution, pixels, crs_type)
+    layer_request = wms_layer_request(bbox_params)
+    layers = parse_wms_layers(layer_request)
+    layers_as_string = stringify_layers(layers)
+    depth_request = wms_aquifer_info_request(layers_as_string, bbox_params)
+    layer_data = parse_layer_info(depth_request)
+    formatted_depth_data = format_data_depth_table(layer_data)
+    return formatted_depth_data
+
 def get_bbox_params(coordinates, min_resolution:int|float=100, pixels=(100,100), crs_type:str='wgs84' ):
     """
     transforms provided coordinates into web mercator coordinate system
@@ -17,7 +28,7 @@ def get_bbox_params(coordinates, min_resolution:int|float=100, pixels=(100,100),
     inputs: coorindates:tuple or list, 
     crs_type(string), 
     minimum resolution of the queried data in metre
-    pixels: (width, height) as tuple
+    pixels: (width, height) as tuple or list
     output: 
     f'{bbox_xy}'.strip('()')
     """
@@ -159,3 +170,21 @@ def format_data_depth_table(layer_data:list):
         depth = aquidepth + thickness
         layer_dict['depth_to_base'].append(depth)
     return layer_dict
+
+
+def check_feasibility(layer_dict):
+    #TODO: implement check
+    layers = layer_dict['aquifer_layer'] 
+    if len(layers) == 0:
+        return False, {'message': 'Aquifer layer is empty'}
+    top_layer = layers[0]
+    if top_layer not in ['100qa', '102utqa']:
+        return False, {'message': 'Top layer is not aquifer'}
+    #TODO: change this logic later
+    target_layer = next((layer for layer in ('109lmta','111lta') if layer in layers),
+                        False)
+    if not target_layer:
+        return False, {'message': 'Target layers not present in the layer list'}
+    return True, {'top_aquifer_layer':top_layer, 'target_aquifer_layer':target_layer}
+    
+
