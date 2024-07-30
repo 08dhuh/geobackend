@@ -7,6 +7,19 @@ import re
 import logging
 from .reference_data import *
 
+# caching
+import time, requests, redis, pickle
+from hashlib import md5
+
+# Connect to Redis
+redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
+
+def generate_cache_key(params):
+    # Generate a unique cache key based on the request parameters
+    key_string = str(params)
+    return md5(key_string.encode('utf-8')).hexdigest()
+
+
 logger = logging.getLogger('geobackend_api')
 
 
@@ -70,10 +83,21 @@ def wms_layer_request(bbox_params):
     }
 
     url = f"{base_url}?{urllib.parse.urlencode(params)}"
+    #caching
+    cache_key = generate_cache_key(params)
 
-    response = requests.get(url)    
-    return response
-
+    cached_result = redis_client.get(cache_key)
+    if cached_result:
+        return pickle.loads(cached_result) 
+    
+    try:
+        response = requests.get(url)    
+        response.raise_for_status()
+        redis_client.setex(cache_key, 3600, pickle.dumps(response))
+        return response
+    except requests.exceptions.RequestException as e:
+        logger.error(e)
+        
 
 def parse_wms_layers(response:requests.Response) -> list:
     soup = BeautifulSoup(response.text, 'html.parser')
@@ -119,8 +143,20 @@ def wms_aquifer_info_request(layer_string:str, bbox_params):
         "FEATURE_COUNT": 50
     }
     url = f"{base_url}?{urllib.parse.urlencode(params)}"
-    response = requests.get(url)
-    return response
+    #caching
+    cache_key = generate_cache_key(params)
+
+    cached_result = redis_client.get(cache_key)
+    if cached_result:
+        return pickle.loads(cached_result) 
+    
+    try:
+        response = requests.get(url)    
+        response.raise_for_status()
+        redis_client.setex(cache_key, 3600, pickle.dumps(response))
+        return response
+    except requests.exceptions.RequestException as e:
+        logger.error(e)
 
 
 def parse_layer_info(response):
