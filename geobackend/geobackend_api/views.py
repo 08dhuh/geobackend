@@ -2,10 +2,7 @@ from django.shortcuts import render
 #DRF
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.decorators import api_view
 from rest_framework.views import APIView
-from rest_framework import generics
-from rest_framework.viewsets import ModelViewSet
 
 from geodrillcalc import geodrillcalc as gdc
 import pandas as pd
@@ -13,8 +10,6 @@ import pandas as pd
 from .models import *
 from .serializers import *
 from .utils import process_depth_data, check_feasibility
-
-
 
 
 class WellBoreCalcView(APIView):
@@ -66,8 +61,8 @@ class WellBoreCalcView(APIView):
             results = geo_interface.export_results_to_dict()
 
             # Save the results to the model
-            #session_key = request.session.session_key
-            #WellBoreCalculationResult.objects.create(session_key=session_key, result_data=results)
+            session_key = request.session.session_key
+            WellBoreCalculationResult.objects.create(session_key=session_key, result_data=results)
 
         
             return Response({'message':'Calculation successful', 
@@ -78,7 +73,7 @@ class WellBoreCalcView(APIView):
 
 
 
-class WellboreCalculationView(APIView):
+class TestWellboreCalculationView(APIView):
     def post(self, request, *args, **kwargs):
         data = request.data
 

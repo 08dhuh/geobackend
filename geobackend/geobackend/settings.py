@@ -39,11 +39,13 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
+    "corsheaders", #corsheaders
     "geobackend_api",
     "debug_toolbar",
 ]
 
 MIDDLEWARE = [
+    "corsheaders.middleware.CorsMiddleware", #corsheaders at the top
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -129,6 +131,10 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 INTERNAL_IPS = [
     '127.0.0.1'
+]
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",  # Frontend development server
 ]
 
 # Logging configuration

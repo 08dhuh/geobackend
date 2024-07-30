@@ -8,7 +8,7 @@ router = routers.DefaultRouter()
 
 urlpatterns = [
     path('calculate-wellbore', WellBoreCalcView.as_view()),
-    path('calculate-profile', WellboreCalculationView.as_view()),
+    path('calculate-profile', TestWellboreCalculationView.as_view()),
 
 ] 
 
