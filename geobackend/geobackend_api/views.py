@@ -21,6 +21,8 @@ logger = logging.getLogger('geobackend_api')
 class WellBoreCalcView(APIView):
     def post(self, request, *args, **kwargs):
         data = request.data
+        if not request.session.session_key:
+            request.session.create()
 
         # validate and extract parameters from request
         serializer = WellBoreCalcInputSerializer(data=data)
