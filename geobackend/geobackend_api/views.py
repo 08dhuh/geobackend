@@ -1,5 +1,5 @@
 from django.shortcuts import render
-#DRF
+# DRF
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
@@ -9,7 +9,13 @@ import pandas as pd
 
 from .models import *
 from .serializers import *
-from .utils import process_depth_data, check_feasibility
+from .utils import process_depth_data, check_feasibility, GeoDjangoJSONEncoder, generate_cache_key
+
+import json
+import logging
+
+
+logger = logging.getLogger('geobackend_api')
 
 
 class WellBoreCalcView(APIView):
@@ -28,26 +34,27 @@ class WellBoreCalcView(APIView):
             initial_input_values = validated_data['initial_input_values']
             is_production_pump = validated_data['is_production_pump']
 
-            #query WMS data
+            # query WMS data
             depth_data = process_depth_data(coodinates,
                                             min_resolution,
                                             pixels,
                                             crs_type)
-            
-            #check if the calculation can be performed on the queried data
+
+            # check if the calculation can be performed on the queried data
             is_feasible, response_feasible = check_feasibility(depth_data)
             if not is_feasible:
                 return Response(response_feasible,
                                 status=status.HTTP_400_BAD_REQUEST)
-            
-            #update and validate initial_input_values object
+
+            # update and validate initial_input_values object
             initial_input_values['top_aquifer_layer'] = response_feasible['top_aquifer_layer']
             initial_input_values['target_aquifer_layer'] = response_feasible['target_aquifer_layer']
 
-            input_serializer = InitialInputSerializer(data=initial_input_values)
+            input_serializer = InitialInputSerializer(
+                data=initial_input_values)
             if not input_serializer.is_valid():
                 return Response(input_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            
+
             # convert depth data to pandas dataframe
             depth_data_df = pd.DataFrame(depth_data)
 
@@ -59,23 +66,26 @@ class WellBoreCalcView(APIView):
                 initial_input_data=initial_input_values
             )
             results = geo_interface.export_results_to_dict()
+            json_results = json.dumps(results, cls=GeoDjangoJSONEncoder)
+
 
             # Save the results to the model
             session_key = request.session.session_key
-            WellBoreCalculationResult.objects.create(session_key=session_key, result_data=results)
+            _, created = WellBoreCalculationResult.objects.update_or_create(
+                session_key=session_key, result_data=json_results)
+            logging.info(f"{'Created' if created else 'Updated'} WellBoreCalculationResult results for {session_key}")
 
-        
-            return Response({'message':'Calculation successful', 
+            return Response({'message': 'Calculation successful',
                              'data': results}, status=status.HTTP_200_OK)
         else:
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-
-
 class TestWellboreCalculationView(APIView):
     def post(self, request, *args, **kwargs):
         data = request.data
+        if not request.session.session_key:
+            request.session.create()
 
         # extract parameters from request
         is_production_pump = data["is_production_pump"]
@@ -85,10 +95,9 @@ class TestWellboreCalculationView(APIView):
         # convert depth data to pandas dataframe
         depth_data_df = pd.DataFrame(depth_data)
 
-
         # initialize and use the calculation object
         geo_interface = gdc.GeoDrillCalcInterface()
-        result_wbd = geo_interface.calculate_and_return_wellbore_parameters(
+        geo_interface.calculate_and_return_wellbore_parameters(
             is_production_pump=is_production_pump,
             depth_data=depth_data_df,
             initial_input_data=initial_input_values
@@ -96,16 +105,14 @@ class TestWellboreCalculationView(APIView):
 
         # #retrieve the result as dictionary
         results = geo_interface.export_results_to_dict()
-        #print(results)
-        #results = results.replace(np.nan, None) #np.nan not serializable
-        #results = results.to_json()
-        # #store the results in the database
-        # depth_query = DepthQuery(results)
-        # depth_query.save()
+        json_results = json.dumps(results, cls=GeoDjangoJSONEncoder)
+        # Save the results to the model
 
-        # #serialize and return the results
-        # serializer = DepthQuerySerializer(depth_query)
-        #print(results)
+
+        session_key = request.session.session_key
+        _, created = WellBoreCalculationResult.objects.update_or_create(
+            session_key=session_key, result_data=json_results)
+        logging.info(f"{'Created' if created else 'Updated'} WellBoreCalculationResult results for {session_key}")
         
-        return Response({'data':results}, status=status.HTTP_200_OK)
-    
+
+        return Response({'data': results}, status=status.HTTP_200_OK)
