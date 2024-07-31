@@ -32,7 +32,7 @@ class InitialInputSerializer(serializers.Serializer):
 
 class WellBoreCalcInputSerializer(serializers.Serializer):
     coordinates = serializers.ListField(
-        child = serializers.IntegerField(),
+        child = serializers.FloatField(),
         min_length = 2,
         max_length = 2
     )
@@ -50,7 +50,7 @@ class WellBoreCalcInputSerializer(serializers.Serializer):
         if not isinstance(value, (list, tuple)):
             raise serializers.ValidationError("coordinates must be a list or tuple")
         if len(value) != 2:
-            raise serializers.ValidationError("coordinates must contain exactly two integers")
+            raise serializers.ValidationError("coordinates must contain exactly two numbers")
         return value
     
     def validate_pixels(self, value):
