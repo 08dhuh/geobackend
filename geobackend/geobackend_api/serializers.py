@@ -31,7 +31,7 @@ class InitialInputSerializer(serializers.Serializer):
 
 
 class WellBoreCalcInputSerializer(serializers.Serializer):
-    loc_vicgrid = serializers.ListField(
+    coordinates = serializers.ListField(
         child = serializers.IntegerField(),
         min_length = 2,
         max_length = 2
@@ -46,11 +46,11 @@ class WellBoreCalcInputSerializer(serializers.Serializer):
     initial_input_values = InitialInputSerializer()
     is_production_pump = serializers.CharField(max_length=5)
 
-    def validate_loc_vicgrid(self, value):
+    def validate_coordinates(self, value):
         if not isinstance(value, (list, tuple)):
-            raise serializers.ValidationError("loc_vicgrid must be a list or tuple")
+            raise serializers.ValidationError("coordinates must be a list or tuple")
         if len(value) != 2:
-            raise serializers.ValidationError("loc_vicgrid must contain exactly two integers")
+            raise serializers.ValidationError("coordinates must contain exactly two integers")
         return value
     
     def validate_pixels(self, value):

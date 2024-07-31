@@ -29,7 +29,7 @@ class WellBoreCalcView(APIView):
         if serializer.is_valid():
             validated_data = serializer.validated_data
 
-            coodinates = validated_data['loc_vicgrid']
+            coodinates = validated_data['coordinates']
             crs_type = validated_data['crs_type']
             min_resolution = validated_data['min_resolution']
             pixels = validated_data['pixels']
