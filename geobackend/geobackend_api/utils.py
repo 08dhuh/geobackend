@@ -20,8 +20,9 @@ from hashlib import md5
 
 # global variables
 redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
-redis_timeout = 3600*24 #1 day
+redis_timeout = 3600*24  # 1 day
 logger = logging.getLogger('geobackend_api')
+
 
 class GeoDjangoJSONEncoder(DjangoJSONEncoder):
     def default(self, obj):
@@ -32,6 +33,7 @@ class GeoDjangoJSONEncoder(DjangoJSONEncoder):
         elif isinstance(obj, np.generic):
             return np.asscalar(obj)
         return super().default(obj)
+
 
 def process_depth_data(coordinates, min_resolution: int | float = 100, pixels=(100, 100), crs_type: str = 'wgs84'):
     bbox_params = get_bbox_params(
@@ -135,7 +137,6 @@ def wms_layer_request(bbox_params):
     #     logger.error(e)
 
 
-
 def parse_wms_layers(response: requests.Response) -> list:
     soup = BeautifulSoup(response.text, 'html.parser')
     if response.status_code == 200:
@@ -144,8 +145,7 @@ def parse_wms_layers(response: requests.Response) -> list:
         layers += ['114bse']  # basement layer at the bottom
         return layers
     else:
-        logger.error(f"Error in parse_wms_layers: {
-                     response.status_code}, {response.text}")
+        logger.error(f"Error in parse_wms_layers: {response.status_code}, {response.text}")
         raise requests.exceptions.HTTPError(
             f"Error: {response.status_code}, {response.text}")
 
@@ -189,8 +189,7 @@ def wms_aquifer_info_request(layer_string: str, bbox_params):
 
 def parse_layer_info(response):
     if response.status_code != 200:
-        logger.error(f"Error in parse_layer_info: {
-                     response.status_code}, {response.text}")
+        logger.error(f"Error in parse_layer_info: {response.status_code}, {response.text}")
         raise requests.exceptions.HTTPError(
             f"Error: {response.status_code}, {response.text}")
 
@@ -215,13 +214,11 @@ def parse_layer_info(response):
                         # Handle the -9999 value
                         float_value = float(value.replace(',', ''))
                         if float_value == -9999:
-                            logger.info(f"Aqdepth for {
-                                        layer_code} is -9999, treating as 0")
+                            logger.info(f"Aqdepth for {layer_code} is -9999, treating as 0")
                             float_value = 0
                         data[layer_code][field] = float_value
                     except ValueError:
-                        logger.error(f"Could not convert {
-                                     value} to float for {key}")
+                        logger.error(f"Could not convert {value} to float for {key}")
     return data
 
 
@@ -235,7 +232,8 @@ def format_data_depth_table(layer_data: list):
         aquidepth = item.get('Aqdepth', 0)
         if aquidepth == -9999:
             aquidepth = 0  # ensure -9999 is treated as 0
-        thickness = 200 if 'bse' in key else item.get('Thickness', 0) #basement thickness fixed at 200
+        thickness = 200 if 'bse' in key else item.get(
+            'Thickness', 0)  # basement thickness fixed at 200
         depth = aquidepth + thickness
         layer_dict['depth_to_base'].append(depth)
     return layer_dict
@@ -255,4 +253,3 @@ def check_feasibility(layer_dict):
     if not target_layer:
         return False, {'message': 'Target layers not present in the layer list'}
     return True, {'top_aquifer_layer': top_layer, 'target_aquifer_layer': target_layer}
-
