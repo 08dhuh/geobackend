@@ -77,6 +77,9 @@ class WellBoreCalcView(APIView):
             # convert depth data to pandas dataframe
             depth_data_df = pd.DataFrame(depth_data)
 
+            logging.info(depth_data)
+            logging.info(initial_input_values)
+
             # initialize and use the calculation object
             geo_interface = gdc.GeoDrillCalcInterface()
             geo_interface.calculate_and_return_wellbore_parameters(
