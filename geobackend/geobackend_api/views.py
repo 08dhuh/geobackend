@@ -83,9 +83,9 @@ class WellBoreCalcView(APIView):
             # initialize and use the calculation object
             geo_interface = gdc.GeoDrillCalcInterface()
             geo_interface.calculate_and_return_wellbore_parameters(
-                is_production_pump=is_production_pump,
-                depth_data=depth_data_df,
-                initial_input_data=initial_input_values
+                is_production_well=is_production_pump,
+                aquifer_layer_table=depth_data_df,
+                initial_input_params=initial_input_values
             )
             results = geo_interface.export_results_to_dict()
             json_results = json.dumps(results, cls=GeoDjangoJSONEncoder)
@@ -120,9 +120,9 @@ class TestWellboreCalculationView(APIView):
         # initialize and use the calculation object
         geo_interface = gdc.GeoDrillCalcInterface()
         geo_interface.calculate_and_return_wellbore_parameters(
-            is_production_pump=is_production_pump,
-            depth_data=depth_data_df,
-            initial_input_data=initial_input_values
+            is_production_well=is_production_pump,
+            aquifer_layer_table=depth_data_df,
+            initial_input_params=initial_input_values
         )
 
         # #retrieve the result as dictionary
