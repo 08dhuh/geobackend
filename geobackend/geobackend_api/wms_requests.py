@@ -33,6 +33,9 @@ redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
 redis_timeout = 3600*24  # 1 day
 logger = logging.getLogger('geobackend_api')
 
+logging.basicConfig(
+            level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S %d-%m-%Y")
+
 
 #exported methods
 def generate_formatted_depth_data(coordinates, 
@@ -72,13 +75,15 @@ def fetch_watertable_depth(coordinates,
 def load_or_get_results(url, params):
     cache_key = generate_cache_key(params)
     cached_result = redis_client.get(cache_key)
+    # log reqeut start
     if cached_result:
         logger.info(f'cache hit for {cache_key}')
         return pickle.loads(cached_result)
     try:
+        logger.info(f'request started, url: {url}')
         response = requests.get(url)
+        logger.info(f'request started, response: {response}')
         response.raise_for_status()
-        redis_client.setex(cache_key, redis_timeout, pickle.dumps(response))
         return response
     except requests.exceptions.RequestException as e:
         logger.error(e)
@@ -88,6 +93,9 @@ def load_or_get_results(url, params):
                 "message": str(e)
             }
         }
+    finally:
+        redis_client.setex(cache_key, redis_timeout, pickle.dumps(response))
+
 
 
 
