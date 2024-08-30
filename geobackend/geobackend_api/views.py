@@ -1,4 +1,4 @@
-from django.shortcuts import render
+# from django.shortcuts import render
 # DRF
 from rest_framework.response import Response
 from rest_framework import status
@@ -9,7 +9,8 @@ import pandas as pd
 
 from .models import *
 from .serializers import *
-from .utils import process_depth_data, check_feasibility, GeoDjangoJSONEncoder, generate_cache_key
+from .wms_requests import generate_formatted_depth_data, fetch_watertable_depth
+from .utils import check_calculation_feasibility, GeoDjangoJSONEncoder
 
 import json
 import logging
@@ -25,11 +26,11 @@ class WellBoreCalcView(APIView):
             request.session.create()
 
         # validate and extract parameters from request
-        serializer = WellBoreCalcInputSerializer(data=data)
+        serializer = UserInputSerializer(data=data)
         if serializer.is_valid():
             validated_data = serializer.validated_data
 
-            coodinates = validated_data['loc_vicgrid']
+            coodinates = validated_data['coordinates']
             crs_type = validated_data['crs_type']
             min_resolution = validated_data['min_resolution']
             pixels = validated_data['pixels']
@@ -37,28 +38,47 @@ class WellBoreCalcView(APIView):
             is_production_pump = validated_data['is_production_pump']
 
             # query WMS data
-            depth_data = process_depth_data(coodinates,
-                                            min_resolution,
-                                            pixels,
-                                            crs_type)
+            depth_data = generate_formatted_depth_data(coodinates,
+                                                       min_resolution,
+                                                       pixels,
+                                                       crs_type)
+            watertable_depth = fetch_watertable_depth(coodinates,
+                                                      min_resolution,
+                                                      pixels,
+                                                      crs_type)
 
             # check if the calculation can be performed on the queried data
-            is_feasible, response_feasible = check_feasibility(depth_data)
+            is_feasible, response_feasible = check_calculation_feasibility(
+                depth_data)
             if not is_feasible:
                 return Response(response_feasible,
                                 status=status.HTTP_400_BAD_REQUEST)
 
             # update and validate initial_input_values object
+            initial_input_values['groundwater_depth'] = watertable_depth
             initial_input_values['top_aquifer_layer'] = response_feasible['top_aquifer_layer']
             initial_input_values['target_aquifer_layer'] = response_feasible['target_aquifer_layer']
 
-            input_serializer = InitialInputSerializer(
-                data=initial_input_values)
-            if not input_serializer.is_valid():
-                return Response(input_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            # input_serializer = InitialInputSerializer(
+            #     data=initial_input_values)
+            # if not input_serializer.is_valid():
+            #     return Response(input_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+            calculation_input_serializer = CalculationInputSerializer(
+                data={
+                    "is_production_pump": is_production_pump,
+                    "depth_data": depth_data,
+                    "initial_input_values": initial_input_values,
+                }
+            )
+            if not calculation_input_serializer.is_valid():
+                return Response(calculation_input_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
             # convert depth data to pandas dataframe
             depth_data_df = pd.DataFrame(depth_data)
+
+            logging.info(depth_data)
+            logging.info(initial_input_values)
 
             # initialize and use the calculation object
             geo_interface = gdc.GeoDrillCalcInterface()
@@ -70,12 +90,12 @@ class WellBoreCalcView(APIView):
             results = geo_interface.export_results_to_dict()
             json_results = json.dumps(results, cls=GeoDjangoJSONEncoder)
 
-
             # Save the results to the model
             session_key = request.session.session_key
             _, created = WellBoreCalculationResult.objects.update_or_create(
                 session_key=session_key, result_data=json_results)
-            logging.info(f"{'Created' if created else 'Updated'} WellBoreCalculationResult results for {session_key}")
+            logging.info(
+                f"{'Created' if created else 'Updated'} WellBoreCalculationResult results for {session_key}")
 
             return Response({'message': 'Calculation successful',
                              'data': results}, status=status.HTTP_200_OK)
@@ -110,11 +130,10 @@ class TestWellboreCalculationView(APIView):
         json_results = json.dumps(results, cls=GeoDjangoJSONEncoder)
         # Save the results to the model
 
-
         session_key = request.session.session_key
         _, created = WellBoreCalculationResult.objects.update_or_create(
             session_key=session_key, result_data=json_results)
-        logging.info(f"{'Created' if created else 'Updated'} WellBoreCalculationResult results for {session_key}")
-        
+        logging.info(
+            f"{'Created' if created else 'Updated'} WellBoreCalculationResult results for {session_key}")
 
         return Response({'data': results}, status=status.HTTP_200_OK)
