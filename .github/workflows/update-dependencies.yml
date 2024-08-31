@@ -4,6 +4,10 @@ on:
   workflow_dispatch:
   repository_dispatch:
     types: [update_dependencies]
+
+permissions:
+  contents: write
+
 jobs:
   update-dependencies:
     runs-on: ubuntu-latest
@@ -23,6 +27,7 @@ jobs:
       run: python update_requirements.py
 
     - name: Commit changes
+      if: env.CHANGES == 'true'
       run: |
         git config --global user.name 'GitHub Actions'
         git config --global user.email 'actions@github.com'
