@@ -2,7 +2,8 @@ name: Update Dependencies
 
 on:
   workflow_dispatch:
-
+  repository_dispatch:
+    types: [update_dependencies]
 jobs:
   update-dependencies:
     runs-on: ubuntu-latest
