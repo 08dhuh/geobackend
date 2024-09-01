@@ -1,0 +1,8 @@
+-r requirements.txt
+
+# Development dependencies
+django-debug-toolbar==4.4.2
+flake8==6.1.0
+pytest==8.3.2
+pytest-django==4.5.2
+

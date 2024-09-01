@@ -21,12 +21,44 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-_qa2$b5uj3yi_4_e(nu&%!t46fe58#gr+4!d%k8ba3czp_#si3"
+# Security settings
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-_qa2$b5uj3yi_4_e(nu&%!t46fe58#gr+4!d%k8ba3czp_#si3')
+DEBUG = os.environ.get('DJANGO_DEBUG', 'False') == 'True'
+ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '*').split(',')
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+STATIC_URL = "static/"
+# Define STATIC_ROOT for production
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
-ALLOWED_HOSTS = []
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': f"redis://{os.environ.get('REDIS_HOST', 'redis')}:{os.environ.get('REDIS_PORT', '6379')}/1",
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+        },
+        'KEY_PREFIX': 'geobackend'
+    }
+}
+# CACHES = {
+#     'default': {
+#         'BACKEND': 'django_redis.cache.RedisCache',
+#         'LOCATION': 'redis://127.0.0.1:6379/1',
+#         'OPTIONS': {
+#             'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+#         },
+#         'KEY_PREFIX': 'geobackend'
+#     }
+# }
+
+
+# SECRET_KEY = "django-insecure-_qa2$b5uj3yi_4_e(nu&%!t46fe58#gr+4!d%k8ba3czp_#si3"
+
+# # SECURITY WARNING: don't run with debug turned on in production!
+# DEBUG = False
+
+# ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -122,7 +154,7 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
-STATIC_URL = "static/"
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
@@ -187,13 +219,4 @@ LOGGING = {
 }
 
 
-CACHES = {
-    'default': {
-        'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': 'redis://127.0.0.1:6379/1',
-        'OPTIONS': {
-            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
-        },
-        'KEY_PREFIX': 'geobackend'
-    }
-}
+

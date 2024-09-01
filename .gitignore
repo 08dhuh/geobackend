@@ -162,3 +162,5 @@ cython_debug/
 #.idea/
 inputs.json
 outputs.json
+
+geodrillcalc/geodrillcalc/settings.py

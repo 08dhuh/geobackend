@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    command: gunicorn --bind 0.0.0.0:8000 geobackend.wsgi:application
+    volumes:
+      - .:/app
+    working_dir: /app/geobackend  # Set working directory to where manage.py is located
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+    environment:
+
+      - DJANGO_DEBUG=False
+      - DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+  redis:
+    image: redis:6
+    ports:
+      - "6379:6379"
