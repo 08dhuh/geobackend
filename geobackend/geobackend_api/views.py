@@ -3,6 +3,7 @@
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
+from rest_framework.throttling import AnonRateThrottle
 
 import geodrillcalc.geodrillcalc_interface as gdc
 import pandas as pd
@@ -20,6 +21,8 @@ logger = logging.getLogger('geobackend_api')
 
 
 class WellBoreCalcView(APIView):
+    throttle_classes = [AnonRateThrottle]
+
     def post(self, request, *args, **kwargs):
         data = request.data
         if not request.session.session_key:
