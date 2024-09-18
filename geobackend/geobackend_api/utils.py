@@ -28,9 +28,11 @@ def check_calculation_feasibility(layer_dict:dict):
     top_layer = layers[0]
     if top_layer not in ['100qa', '102utqa']:
         return False, {'message': 'Top layer is not aquifer'}
-    # TODO: change this logic later
-    target_layer = next((layer for layer in ('109lmta', '111lta') if layer in layers),
-                        False)
+    # TODO: change this logic later: target layer
+    # target_layer = next((layer for layer in ('109lmta', '111lta') if layer in layers),
+    #                     False)
+    target_layer = '111lta' if '111lta' in layers else False
+
     if not target_layer:
         return False, {'message': 'Target layers not present in the layer list'}
     return True, {'top_aquifer_layer': top_layer, 'target_aquifer_layer': target_layer}

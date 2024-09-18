@@ -1,3 +1,4 @@
+import time
 from pyproj import Transformer
 import numpy as np
 import requests
@@ -31,11 +32,10 @@ wms_request_dict = {
 }
 redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
 redis_timeout = 3600*24  # 1 day
-logger = logging.getLogger('geobackend_api')
 
 logging.basicConfig(
             level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S %d-%m-%Y")
-
+logger = logging.getLogger('geobackend_api')
 
 #exported methods
 def generate_formatted_depth_data(coordinates, 
@@ -80,10 +80,17 @@ def load_or_get_results(url, params):
         logger.info(f'cache hit for {cache_key}')
         return pickle.loads(cached_result)
     try:
-        logger.info(f'request started, url: {url}')
+        start_time = time.time()
+        logger.info(f'Request started at {time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start_time))}.{int((start_time % 1) * 1000):03d}, url: {url}')
+       
+        #implement logging here
+        
         response = requests.get(url)
-        logger.info(f'request started, response: {response}')
         response.raise_for_status()
+        
+        end_time = time.time()
+        logger.info(f'Request completed at {time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(end_time))}.{int((end_time % 1) * 1000):03d}, url: {url}, status: {response.status_code}, time_taken: {end_time - start_time:.2f} seconds')
+
         return response
     except requests.exceptions.RequestException as e:
         logger.error(e)
