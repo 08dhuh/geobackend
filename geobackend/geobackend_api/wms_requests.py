@@ -34,7 +34,11 @@ redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
 redis_timeout = 3600*24  # 1 day
 
 logging.basicConfig(
-            level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S %d-%m-%Y")
+            filename='api_requests.log',
+            level=logging.INFO, 
+            format="%(asctime)s %(levelname)s %(message)s", 
+            #datefmt="%H:%M:%S %d-%m-%Y")
+            datefmt="%Y-%m-%d %H:%M:%S")
 logger = logging.getLogger('geobackend_api')
 
 #exported methods
