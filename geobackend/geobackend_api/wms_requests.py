@@ -88,8 +88,11 @@ def load_or_get_results(url, params):
         logger.info(f'Request started at {time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start_time))}.{int((start_time % 1) * 1000):03d}, url: {url}')
        
         #implement logging here
-        
-        response = requests.get(url)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36'
+        }
+
+        response = requests.get(url, headers=headers)
         response.raise_for_status()
         
         end_time = time.time()
