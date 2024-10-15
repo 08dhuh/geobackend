@@ -1,5 +1,3 @@
-# from django.shortcuts import render
-# DRF
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
@@ -11,7 +9,7 @@ import pandas as pd
 from .models import *
 from .serializers import *
 from .wms_requests import generate_formatted_depth_data, fetch_watertable_depth
-from .utils import check_calculation_feasibility, GeoDjangoJSONEncoder
+from .utils import GeoDjangoJSONEncoder
 
 import json
 import logging
@@ -28,7 +26,6 @@ class WellBoreCalcView(APIView):
         if not request.session.session_key:
             request.session.create()
         logging.info(f"Received data: {data}")
-        # validate and extract parameters from request
         serializer = UserInputSerializer(data=data)
         if not serializer.is_valid():
             logging.error("User input validation failed: {serializer.errors)")
@@ -36,7 +33,6 @@ class WellBoreCalcView(APIView):
                 'message': 'Invalid input data.',
                 'details': serializer.errors
             }, status=status.HTTP_400_BAD_REQUEST)
-
 
         validated_data = serializer.validated_data
 
@@ -56,28 +52,27 @@ class WellBoreCalcView(APIView):
                                                   min_resolution,
                                                   pixels,
                                                   crs_type)
-        # check if the calculation can be performed on the queried data
 
         logging.info(depth_data)
         logging.info(f'WMS depth: {watertable_depth}')
-        
-        is_feasible, response_feasible = check_calculation_feasibility(
-            depth_data)
-        if not is_feasible:
 
-            logging.error(
-                f"Calculation feasibility check failed")
-            return Response({
-                'message': 'Calculation cannot be performed at the selected location.',
-                'details': response_feasible
-            }, status=status.HTTP_400_BAD_REQUEST)
+        # TODO: move this into gdc package
+        # is_feasible, response_feasible = check_calculation_feasibility(
+        #     depth_data)
+        # if not is_feasible:
+        #     logging.error(
+        #         f"Calculation feasibility check failed")
+        #     return Response({
+        #         'message': 'Calculation cannot be performed at the selected location.',
+        #         'details': response_feasible
+        #     }, status=status.HTTP_400_BAD_REQUEST)
 
-        # update and validate initial_input_values object
         initial_input_values['groundwater_depth'] = watertable_depth
-        initial_input_values['top_aquifer_layer'] = response_feasible['top_aquifer_layer']
-        initial_input_values['target_aquifer_layer'] = response_feasible['target_aquifer_layer']
+        initial_input_values['top_aquifer_layer'] = depth_data['aquifer_layer'][0]
+        # lower tertiary aquifer
+        initial_input_values['target_aquifer_layer'] = '111lta'
 
-
+        # serialize and validate the input
         calculation_input_serializer = CalculationInputSerializer(
             data={
                 "is_production_pump": is_production_pump,
@@ -86,18 +81,19 @@ class WellBoreCalcView(APIView):
             }
         )
         if not calculation_input_serializer.is_valid():
-            logging.error(f"Calculation input validation failed: {calculation_input_serializer.errors}")
+            logging.error(
+                f"Calculation input serialization failed: {calculation_input_serializer.errors}")
             return Response({
-                'message': 'Invalid input data.',
+                'message': 'Failed serialization.',
                 'details': calculation_input_serializer.errors
             }, status=status.HTTP_400_BAD_REQUEST)
-        # convert depth data to pandas dataframe
+
         depth_data_df = pd.DataFrame(depth_data)
 
         logging.info(depth_data)
         logging.info(initial_input_values)
 
-        # initialize and use the calculation object
+        # initialise the calculation module
         geo_interface = gdc.GeoDrillCalcInterface()
 
         try:
@@ -106,12 +102,21 @@ class WellBoreCalcView(APIView):
                 aquifer_layer_table=depth_data_df,
                 initial_input_params=initial_input_values
             )
+        except ValueError as e:
+            logging.error(f"Validation error in geodrillcalc: {e}")
+            return Response({
+                'message': 'Error during calculation:\n',
+                'details': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({
                 'message': 'An error occurred during calculation.',
                 'details': str(e)
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+        # TODO: save the depth data as well
+
+        # TODO: exporting the results to dict format
         results = geo_interface.export_results_to_dict()
         json_results = json.dumps(results, cls=GeoDjangoJSONEncoder)
 
