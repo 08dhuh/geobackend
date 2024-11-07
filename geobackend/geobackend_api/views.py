@@ -25,17 +25,13 @@ class WellBoreCalcView(APIView):
         data = request.data
         session_key = self.get_or_create_session_key(request=request)
 
-        logging.info(f"Received data: {data}")
+        logger.info(f"Session {session_key} - Received data: {data}")
         serializer = UserInputSerializer(data=data)
         if not serializer.is_valid():
-            logging.error("User input validation failed: {serializer.errors)")
-            return Response({
-                'message': 'Invalid input data.',
-                'details': serializer.errors
-            }, status=status.HTTP_400_BAD_REQUEST)
+            logger.error(f"Session {session_key} - User input validation failed: {serializer.errors}")
+            return self.create_response("Invalid input data.", serializer.errors, status.HTTP_400_BAD_REQUEST)
 
         validated_data = serializer.validated_data
-
         coodinates = validated_data['coordinates']
         crs_type = validated_data['crs_type']
         min_resolution = validated_data['min_resolution']
@@ -44,22 +40,26 @@ class WellBoreCalcView(APIView):
         is_production_pump = validated_data['is_production_pump']
 
         # query WMS data
-        depth_data = generate_formatted_depth_data(coodinates,
-                                                   min_resolution,
-                                                   pixels,
-                                                   crs_type)
-        watertable_depth = fetch_watertable_depth(coodinates,
-                                                  min_resolution,
-                                                  pixels,
-                                                  crs_type)
-
-        logging.info(depth_data)
-        logging.info(f'WMS depth: {watertable_depth}')
-
+        try:
+            depth_data = generate_formatted_depth_data(coodinates,
+                                                       min_resolution,
+                                                       pixels,
+                                                       crs_type)
+            watertable_depth = fetch_watertable_depth(coodinates,
+                                                      min_resolution,
+                                                      pixels,
+                                                      crs_type)
+            logger.info(
+                f"Session {session_key} - Fetched depth data and watertable depth")
+        except Exception as e:
+            logger.error(
+                f"Session {session_key} - Error fetching WMS data: {e}")
+            return self.create_response("Error fetching data.", str(e), status.HTTP_500_INTERNAL_SERVER_ERROR)
+        # logger.info(f'Session {session_key} - {depth_data}')
+        # logger.info(f'Session {session_key} - WMS depth: {watertable_depth}')
 
         initial_input_values['groundwater_depth'] = watertable_depth
         initial_input_values['top_aquifer_layer'] = depth_data['aquifer_layer'][0]
-        # lower tertiary aquifer
         initial_input_values['target_aquifer_layer'] = '111lta'
 
         # serialize and validate the input
@@ -71,17 +71,14 @@ class WellBoreCalcView(APIView):
             }
         )
         if not calculation_input_serializer.is_valid():
-            logging.error(
-                f"Calculation input serialization failed: {calculation_input_serializer.errors}")
-            return Response({
-                'message': 'Failed serialization.',
-                'details': calculation_input_serializer.errors
-            }, status=status.HTTP_400_BAD_REQUEST)
+            logger.error(
+                f"Session {session_key} - Calculation input serialization failed: {calculation_input_serializer.errors}")
+            return self.create_response(
+                message ='Failed serialization.',
+                details =calculation_input_serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST)
 
         depth_data_df = pd.DataFrame(depth_data)
-
-        logging.info(depth_data)
-        logging.info(initial_input_values)
 
         # initialise the calculation module
         geo_interface = gdc.GeoDrillCalcInterface()
@@ -92,37 +89,44 @@ class WellBoreCalcView(APIView):
                 aquifer_layer_table=depth_data_df,
                 initial_input_params=initial_input_values
             )
+            results = geo_interface.export_results_to_dict()
+            logger.info(f"Session {session_key} - Calculation successful.")
         except ValueError as e:
-            logging.error(f"Validation error in geodrillcalc: {e}")
-            return Response({
-                'message': 'Error during calculation:\n',
-                'details': str(e)
-            }, status=status.HTTP_400_BAD_REQUEST)
+            logger.error(
+                f"Session {session_key} - Validation error in geodrillcalc: {e}")
+            return self.create_response(
+                message='Error during calculation:\n',
+                details=str(e), status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            return Response({
-                'message': 'An error occurred during calculation.',
-                'details': str(e)
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        # TODO: save the depth data as well
+            logger.exception(
+                f"Session {session_key} - Unexpected error in calculation.")
+            return self.create_response('An error occurred during calculation.',
+                                        str(e),
+                                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                                        )
 
         # TODO: exporting the results to dict format
-        results = geo_interface.export_results_to_dict()
         json_results = json.dumps(results, cls=GeoDjangoJSONEncoder)
 
         # Save the results to the model
         _, created = WellBoreCalculationResult.objects.update_or_create(
             session_key=session_key, result_data=json_results)
-        logging.info(
-            f"{'Created' if created else 'Updated'} WellBoreCalculationResult results for {session_key}")
 
-        return Response({'message': 'Calculation successful',
-                         'data': results}, status=status.HTTP_200_OK)
+        logger.info(
+            f"Session {session_key} - {'Created' if created else 'Updated'} WellBoreCalculationResult results for {session_key}")
+        return self.create_response(message='Calculation successful',
+                                    details=results)
 
     def get_or_create_session_key(self, request):
         if not request.session.session_key:
             request.session.create()
         return request.session.session_key
+
+    def create_response(self, message, details=None, status=status.HTTP_200_OK):
+        return Response({
+            'message': message,
+            'details': details
+        }, status=status)
 
 
 class TestWellboreCalculationView(APIView):
