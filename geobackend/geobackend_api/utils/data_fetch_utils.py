@@ -5,16 +5,11 @@ import requests
 import urllib
 import re
 from bs4 import BeautifulSoup
-# caching
-#import redis
-#import pickle
-#from hashlib import md5
+
 
 import logging
 
 from .cache_utils import generate_cache_key, get_cache, set_cache
-
-#from ..reference_data import *
 
 
 # global variables
@@ -52,7 +47,6 @@ vaf_mapping = {
     '113cps': 'Cretaceous & Permian Sediments (113)',
     '114bse': 'Cretaceous & Palaeozoic Basement (114)'
 }
-#aquifers = {key.upper():value for key,value in aquifers.items()}
 
 surface_terms = {
     'Aqdepth' : 'Depth to',
@@ -97,14 +91,11 @@ num_to_code_mapping = {
     '114': '114bse'
 }
 
-# redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
-# redis_timeout = 3600*24  # 1 day
 
 logging.basicConfig(
             filename='api_requests.log',
             level=logging.INFO, 
             format="%(asctime)s %(levelname)s %(message)s", 
-            #datefmt="%H:%M:%S %d-%m-%Y")
             datefmt="%Y-%m-%d %H:%M:%S")
 logger = logging.getLogger('geobackend_api')
 
@@ -146,12 +137,10 @@ def fetch_watertable_depth(coordinates,
 def load_or_get_results(url, params):
     cache_key = generate_cache_key(params)
     cached_result = get_cache(cache_key)
-    #cached_result = redis_client.get(cache_key)
-    # log reqeut start
+
     if cached_result:
         return cached_result
-        # logger.info(f'cache hit for {cache_key}')
-        # return pickle.loads(cached_result)
+
     try:
         start_time = time.time()
         logger.info(f'Request started at {time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start_time))}.{int((start_time % 1) * 1000):03d}, url: {url}')
@@ -176,10 +165,6 @@ def load_or_get_results(url, params):
                 "message": str(e)
             }
         }
-    # finally:
-    #     redis_client.setex(cache_key, redis_timeout, pickle.dumps(response))
-
-
 
 
 def _request_wms(request_type: str, **request_params):
@@ -294,11 +279,6 @@ def parse_watertable_depth(response: requests.Response) -> float:
 
 
 #formatters and helpers
-# def generate_cache_key(params):
-#     # Generate a unique cache key based on the request parameters
-#     key_string = str(params)
-#     return md5(key_string.encode('utf-8')).hexdigest()
-
 
 def get_bbox_params(coordinates, min_resolution: int | float = 100, pixels=(100, 100), crs_type: str = 'wgs84'):
     """
