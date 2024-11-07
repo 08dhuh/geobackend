@@ -7,10 +7,11 @@ import logging
 
 from .models import *
 from .serializers import *
-from .utils.data_fetch_utils import generate_formatted_depth_data, fetch_watertable_depth
+#from .utils.data_fetch_utils import generate_formatted_depth_data, fetch_watertable_depth
 from .utils.serialization_utils import GeoDjangoJSONEncoder
 
 from .services.calculation_service import perform_wellbore_calculation
+from .services.data_fetch_service import fetch_depth_data_and_watertable
 
 import json
 
@@ -33,7 +34,7 @@ class WellBoreCalcView(APIView):
             return self.create_response("Invalid input data.", serializer.errors, status.HTTP_400_BAD_REQUEST)
 
         validated_data = serializer.validated_data
-        coodinates = validated_data['coordinates']
+        coordinates = validated_data['coordinates']
         crs_type = validated_data['crs_type']
         min_resolution = validated_data['min_resolution']
         pixels = validated_data['pixels']
@@ -42,19 +43,15 @@ class WellBoreCalcView(APIView):
 
         # query WMS data
         try:
-            depth_data = generate_formatted_depth_data(coodinates,
-                                                       min_resolution,
-                                                       pixels,
-                                                       crs_type)
-            watertable_depth = fetch_watertable_depth(coodinates,
-                                                      min_resolution,
-                                                      pixels,
-                                                      crs_type)
+            depth_data, watertable_depth = fetch_depth_data_and_watertable(coordinates=coordinates,
+                                                         min_resolution=min_resolution,
+                                                         pixels=pixels,
+                                                         crs_type=crs_type)
             logger.info(
                 f"Session {session_key} - Fetched depth data and watertable depth")
         except Exception as e:
-            logger.error(
-                f"Session {session_key} - Error fetching WMS data: {e}")
+            # logger.error(
+            #     f"Session {session_key} - Error fetching WMS data: {e}")
             return self.create_response("Error fetching data.", str(e), status.HTTP_500_INTERNAL_SERVER_ERROR)
         # logger.info(f'Session {session_key} - {depth_data}')
         # logger.info(f'Session {session_key} - WMS depth: {watertable_depth}')
