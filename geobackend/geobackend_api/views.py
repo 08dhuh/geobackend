@@ -2,6 +2,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.throttling import AnonRateThrottle
+import logging
 
 import geodrillcalc.geodrillcalc_interface as gdc
 import pandas as pd
@@ -12,7 +13,6 @@ from .wms_requests import generate_formatted_depth_data, fetch_watertable_depth
 from .utils import GeoDjangoJSONEncoder
 
 import json
-import logging
 
 
 logger = logging.getLogger('geobackend_api')
@@ -23,8 +23,8 @@ class WellBoreCalcView(APIView):
 
     def post(self, request, *args, **kwargs):
         data = request.data
-        if not request.session.session_key:
-            request.session.create()
+        session_key = self.get_or_create_session_key(request=request)
+
         logging.info(f"Received data: {data}")
         serializer = UserInputSerializer(data=data)
         if not serializer.is_valid():
@@ -56,16 +56,6 @@ class WellBoreCalcView(APIView):
         logging.info(depth_data)
         logging.info(f'WMS depth: {watertable_depth}')
 
-        # TODO: move this into gdc package
-        # is_feasible, response_feasible = check_calculation_feasibility(
-        #     depth_data)
-        # if not is_feasible:
-        #     logging.error(
-        #         f"Calculation feasibility check failed")
-        #     return Response({
-        #         'message': 'Calculation cannot be performed at the selected location.',
-        #         'details': response_feasible
-        #     }, status=status.HTTP_400_BAD_REQUEST)
 
         initial_input_values['groundwater_depth'] = watertable_depth
         initial_input_values['top_aquifer_layer'] = depth_data['aquifer_layer'][0]
@@ -121,7 +111,6 @@ class WellBoreCalcView(APIView):
         json_results = json.dumps(results, cls=GeoDjangoJSONEncoder)
 
         # Save the results to the model
-        session_key = request.session.session_key
         _, created = WellBoreCalculationResult.objects.update_or_create(
             session_key=session_key, result_data=json_results)
         logging.info(
@@ -129,6 +118,11 @@ class WellBoreCalcView(APIView):
 
         return Response({'message': 'Calculation successful',
                          'data': results}, status=status.HTTP_200_OK)
+
+    def get_or_create_session_key(self, request):
+        if not request.session.session_key:
+            request.session.create()
+        return request.session.session_key
 
 
 class TestWellboreCalculationView(APIView):
