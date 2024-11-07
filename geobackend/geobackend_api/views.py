@@ -4,12 +4,10 @@ from rest_framework.views import APIView
 from rest_framework.throttling import AnonRateThrottle
 import logging
 
-import geodrillcalc.geodrillcalc_interface as gdc
-
 
 from .models import *
 from .serializers import *
-from .wms_requests import generate_formatted_depth_data, fetch_watertable_depth
+from .services.data_fetch_utils import generate_formatted_depth_data, fetch_watertable_depth
 from .utils import GeoDjangoJSONEncoder
 
 from .services.calculation_service import perform_wellbore_calculation
@@ -80,11 +78,6 @@ class WellBoreCalcView(APIView):
                 message='Failed serialization.',
                 details=calculation_input_serializer.errors,
                 status=status.HTTP_400_BAD_REQUEST)
-
-        # depth_data_df = pd.DataFrame(depth_data)
-
-        # # initialise the calculation module
-        # geo_interface = gdc.GeoDrillCalcInterface()
 
         try:
             results = perform_wellbore_calculation(is_production_pump, depth_data, initial_input_values)
