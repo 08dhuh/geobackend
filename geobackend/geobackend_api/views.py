@@ -5,12 +5,14 @@ from rest_framework.throttling import AnonRateThrottle
 import logging
 
 import geodrillcalc.geodrillcalc_interface as gdc
-import pandas as pd
+
 
 from .models import *
 from .serializers import *
 from .wms_requests import generate_formatted_depth_data, fetch_watertable_depth
 from .utils import GeoDjangoJSONEncoder
+
+from .services.calculation_service import perform_wellbore_calculation
 
 import json
 
@@ -79,28 +81,19 @@ class WellBoreCalcView(APIView):
                 details=calculation_input_serializer.errors,
                 status=status.HTTP_400_BAD_REQUEST)
 
-        depth_data_df = pd.DataFrame(depth_data)
+        # depth_data_df = pd.DataFrame(depth_data)
 
-        # initialise the calculation module
-        geo_interface = gdc.GeoDrillCalcInterface()
+        # # initialise the calculation module
+        # geo_interface = gdc.GeoDrillCalcInterface()
 
         try:
-            geo_interface.calculate_and_return_wellbore_parameters(
-                is_production_well=is_production_pump,
-                aquifer_layer_table=depth_data_df,
-                initial_input_params=initial_input_values
-            )
-            results = geo_interface.export_results_to_dict()
+            results = perform_wellbore_calculation(is_production_pump, depth_data, initial_input_values)
             logger.info(f"Session {session_key} - Calculation successful.")
         except ValueError as e:
-            logger.error(
-                f"Session {session_key} - Validation error in geodrillcalc: {e}")
             return self.create_response(
                 message='Error during calculation:\n',
                 details=str(e), status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            logger.exception(
-                f"Session {session_key} - Unexpected error in calculation.")
             return self.create_response('An error occurred during calculation.',
                                         str(e),
                                         status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -147,18 +140,7 @@ class TestWellboreCalculationView(APIView):
         initial_input_values = data["initial_input_values"]
 
         # convert depth data to pandas dataframe
-        depth_data_df = pd.DataFrame(depth_data)
-
-        # initialize and use the calculation object
-        geo_interface = gdc.GeoDrillCalcInterface()
-        geo_interface.calculate_and_return_wellbore_parameters(
-            is_production_well=is_production_pump,
-            aquifer_layer_table=depth_data_df,
-            initial_input_params=initial_input_values
-        )
-
-        # #retrieve the result as dictionary
-        results = geo_interface.export_results_to_dict()
+        results = perform_wellbore_calculation(is_production_pump, depth_data, initial_input_values)
         json_results = json.dumps(results, cls=GeoDjangoJSONEncoder)
         # Save the results to the model
 
