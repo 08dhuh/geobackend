@@ -15,7 +15,7 @@ from .utils import GeoDjangoJSONEncoder
 import json
 
 
-logger = logging.getLogger('geobackend_api')
+logger = logging.getLogger(__name__)
 
 
 class WellBoreCalcView(APIView):
@@ -28,7 +28,8 @@ class WellBoreCalcView(APIView):
         logger.info(f"Session {session_key} - Received data: {data}")
         serializer = UserInputSerializer(data=data)
         if not serializer.is_valid():
-            logger.error(f"Session {session_key} - User input validation failed: {serializer.errors}")
+            logger.error(
+                f"Session {session_key} - User input validation failed: {serializer.errors}")
             return self.create_response("Invalid input data.", serializer.errors, status.HTTP_400_BAD_REQUEST)
 
         validated_data = serializer.validated_data
@@ -74,9 +75,9 @@ class WellBoreCalcView(APIView):
             logger.error(
                 f"Session {session_key} - Calculation input serialization failed: {calculation_input_serializer.errors}")
             return self.create_response(
-                message ='Failed serialization.',
-                details =calculation_input_serializer.errors,
-            status=status.HTTP_400_BAD_REQUEST)
+                message='Failed serialization.',
+                details=calculation_input_serializer.errors,
+                status=status.HTTP_400_BAD_REQUEST)
 
         depth_data_df = pd.DataFrame(depth_data)
 
@@ -115,17 +116,22 @@ class WellBoreCalcView(APIView):
         logger.info(
             f"Session {session_key} - {'Created' if created else 'Updated'} WellBoreCalculationResult results for {session_key}")
         return self.create_response(message='Calculation successful',
-                                    details=results)
+                                    details=results,
+                                    is_data=True)
 
     def get_or_create_session_key(self, request):
         if not request.session.session_key:
             request.session.create()
         return request.session.session_key
 
-    def create_response(self, message, details=None, status=status.HTTP_200_OK):
+    def create_response(self,
+                        message,
+                        details=None,
+                        status=status.HTTP_200_OK,
+                        is_data=False):
         return Response({
             'message': message,
-            'details': details
+            'data' if is_data else 'details': details
         }, status=status)
 
 
