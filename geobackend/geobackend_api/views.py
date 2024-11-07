@@ -7,8 +7,8 @@ import logging
 
 from .models import *
 from .serializers import *
-from .services.data_fetch_utils import generate_formatted_depth_data, fetch_watertable_depth
-from .utils import GeoDjangoJSONEncoder
+from .utils.data_fetch_utils import generate_formatted_depth_data, fetch_watertable_depth
+from .utils.serialization_utils import GeoDjangoJSONEncoder
 
 from .services.calculation_service import perform_wellbore_calculation
 
