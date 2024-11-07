@@ -12,21 +12,36 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 
 from pathlib import Path
 import os
+import environ
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
+env = environ.Env()
+environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+#print("ALLOWED_HOSTS:",[host.strip() for host in env.list('DJANGO_ALLOWED_HOSTS')])
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-_qa2$b5uj3yi_4_e(nu&%!t46fe58#gr+4!d%k8ba3czp_#si3"
+#SECRET_KEY = "django-insecure-_qa2$b5uj3yi_4_e(nu&%!t46fe58#gr+4!d%k8ba3czp_#si3"
+
+SECRET_KEY = env('DJANGO_SECRET_KEY')
+DEBUG = env.bool('DJANGO_DEBUG', default=False)
+
+#TODO: change for production
+ALLOWED_HOSTS = ['*',]
+#ALLOWED_HOSTS = [host.strip() for host in env.list('DJANGO_ALLOWED_HOSTS')]
+#print(ALLOWED_HOSTS)
+REDIS_URL = env('REDIS_URL')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=["localhost", "127.0.0.1"])
+
+CORS_ALLOWED_ORIGINS =  env.list('DJANGO_CORS_ALLOWED_ORIGINS', default=["http://localhost:3000"])
 
 
 # Application definition
@@ -137,16 +152,12 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+if DEBUG:
+    INTERNAL_IPS = [
+        '127.0.0.1'
+    ]
 
-INTERNAL_IPS = [
-    '127.0.0.1'
-]
 
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",  # Frontend development server
-]
-
-# settings.py
 SESSION_ENGINE = 'django.contrib.sessions.backends.db' 
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 
@@ -199,7 +210,7 @@ LOGGING = {
 CACHES = {
     'default': {
         'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': 'redis://127.0.0.1:6379/1',
+        'LOCATION': REDIS_URL,
         'OPTIONS': {
             'CLIENT_CLASS': 'django_redis.client.DefaultClient',
         },

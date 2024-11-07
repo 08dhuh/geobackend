@@ -5,13 +5,11 @@ import requests
 import urllib
 import re
 from bs4 import BeautifulSoup
-# caching
-import redis
-import pickle
-from hashlib import md5
+
 
 import logging
-from .reference_data import *
+
+from .cache_utils import generate_cache_key, get_cache, set_cache
 
 
 # global variables
@@ -30,14 +28,74 @@ wms_request_dict = {
         "query_layers": "vvg:vaf_depth_watertable_swl100_raw_3857",
     }
 }
-redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
-redis_timeout = 3600*24  # 1 day
+vaf_mapping = {
+    '100qa': 'Quaternary Alluvium (100)',
+    '101utb': 'Upper Tertiary/Quaternary Basalt (101)',
+    '102utqa': 'Upper Tertiary-Quaternary Aquifer (102)',
+    '103utqd': 'Upper Tertiary-Quaternary Aquitard (103)',
+    '104utam': 'Upper Tertiary Aquifer (marine) (104)',
+    '105utaf': 'Upper Tertiary Aquifer (fluvial) (105)',
+    '106utd': 'Upper Tertiary Aquitard (106)',
+    '107umta': 'Upper-Mid Tertiary Aquifer (107)',
+    '108umtd': 'Upper-Mid Tertiary Aquitard (108)',
+    '109lmta': 'Lower-Mid Tertiary Aquifer (109)',
+    '110lmtd': 'Lower-Mid Tertiary Aquitard (110)',
+    '111lta': 'Lower Tertiary Aquifer (111)',
+    '112ltba': 'Lower Tertiary Basalt A stage (112)',
+    '112ltbb': 'Lower Tertiary Basalt B stage (112)',
+    '112ltb': 'Lower Tertiary Basalt (112)',
+    '113cps': 'Cretaceous & Permian Sediments (113)',
+    '114bse': 'Cretaceous & Palaeozoic Basement (114)'
+}
+
+surface_terms = {
+    'Aqdepth' : 'Depth to',
+    'Elevtop' :    'Top Elevation',
+    'Thickness' : 'Thickness',
+    'Elevbottom' : 'Bottom Elevation'
+}
+
+is_aquifer = {
+    '100qa': True,
+    '101utb': False,
+    '102utqa': True,
+    '103utqd': False,
+    '104utam': True,
+    '105utaf': True,
+    '106utd': False,
+    '107umta': True,
+    '108umtd': False,
+    '109lmta': True,
+    '110lmtd': False,
+    '111lta': True,
+    '112ltb': False,
+    '113cps': False,
+    '114bse': False
+}
+
+num_to_code_mapping = {
+    '100': '100qa',
+    '101': '101utb',
+    '102': '102utqa',
+    '103': '103utqd',
+    '104': '104utam',
+    '105': '105utaf',
+    '106': '106utd',
+    '107': '107umta',
+    '108': '108umtd',
+    '109': '109lmta',
+    '110': '110lmtd',
+    '111': '111lta',
+    '112': '112ltb',
+    '113': '113cps',
+    '114': '114bse'
+}
+
 
 logging.basicConfig(
             filename='api_requests.log',
             level=logging.INFO, 
             format="%(asctime)s %(levelname)s %(message)s", 
-            #datefmt="%H:%M:%S %d-%m-%Y")
             datefmt="%Y-%m-%d %H:%M:%S")
 logger = logging.getLogger('geobackend_api')
 
@@ -78,11 +136,11 @@ def fetch_watertable_depth(coordinates,
 #requests
 def load_or_get_results(url, params):
     cache_key = generate_cache_key(params)
-    cached_result = redis_client.get(cache_key)
-    # log reqeut start
+    cached_result = get_cache(cache_key)
+
     if cached_result:
-        logger.info(f'cache hit for {cache_key}')
-        return pickle.loads(cached_result)
+        return cached_result
+
     try:
         start_time = time.time()
         logger.info(f'Request started at {time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(start_time))}.{int((start_time % 1) * 1000):03d}, url: {url}')
@@ -97,7 +155,7 @@ def load_or_get_results(url, params):
         
         end_time = time.time()
         logger.info(f'Request completed at {time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(end_time))}.{int((end_time % 1) * 1000):03d}, url: {url}, status: {response.status_code}, time_taken: {end_time - start_time:.2f} seconds')
-
+        set_cache(cache_key, response)
         return response
     except requests.exceptions.RequestException as e:
         logger.error(e)
@@ -107,10 +165,6 @@ def load_or_get_results(url, params):
                 "message": str(e)
             }
         }
-    finally:
-        redis_client.setex(cache_key, redis_timeout, pickle.dumps(response))
-
-
 
 
 def _request_wms(request_type: str, **request_params):
@@ -225,11 +279,6 @@ def parse_watertable_depth(response: requests.Response) -> float:
 
 
 #formatters and helpers
-def generate_cache_key(params):
-    # Generate a unique cache key based on the request parameters
-    key_string = str(params)
-    return md5(key_string.encode('utf-8')).hexdigest()
-
 
 def get_bbox_params(coordinates, min_resolution: int | float = 100, pixels=(100, 100), crs_type: str = 'wgs84'):
     """
