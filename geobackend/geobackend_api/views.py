@@ -49,6 +49,9 @@ class WellBoreCalcView(APIView):
                                                          crs_type=crs_type)
             logger.info(
                 f"Session {session_key} - Fetched depth data and watertable depth")
+            logger.info(
+                depth_data)
+            logger.info(f"watertable depth: {watertable_depth} m")
         except Exception as e:
             # logger.error(
             #     f"Session {session_key} - Error fetching WMS data: {e}")
