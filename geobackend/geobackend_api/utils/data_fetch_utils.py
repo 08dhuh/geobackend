@@ -352,14 +352,18 @@ def format_data_depth_table(layer_data: list) -> dict:
                   "is_aquifer": [],
                   "depth_to_base": []}
     for key, item in layer_data.items():
-        layer_dict['aquifer_layer'].append(key)
-        layer_dict['is_aquifer'].append(is_aquifer[key])
+        
         aquidepth = item.get('Aqdepth', 0)
         if aquidepth == -9999:
             aquidepth = 0  # ensure -9999 is treated as 0
         thickness = 200 if 'bse' in key else item.get(
             'Thickness', 0)  # basement thickness fixed at 200
         depth = aquidepth + thickness
+        if key != '100qa' and (depth == 0 or thickness == 0):
+            logger.warning(f"Filtered layer {key}: depth_to_base={depth}, thickness={thickness}")
+            continue
+        layer_dict['aquifer_layer'].append(key)
+        layer_dict['is_aquifer'].append(is_aquifer[key])
         layer_dict['depth_to_base'].append(depth)
     return layer_dict
 
